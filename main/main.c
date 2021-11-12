@@ -10,6 +10,10 @@
 #include "nvs_flash.h"
 #include "esp_bt.h"
 
+#include "esp_sleep.h"
+#include "driver/gpio.h"
+#include "driver/rtc_io.h"
+
 #include "esp_gap_ble_api.h"
 #include "esp_gatts_api.h"
 #include "esp_bt_defs.h"
@@ -92,6 +96,27 @@ void onBrightnessChanged(uint8_t value)
     led_set_brightness((double)value);
 }
 
+
+#define DBG_IO      0
+#define DBG_PIN_SEL (1ULL << DBG_IO)
+
+void dbg_io_init(void)
+{
+    gpio_config_t io_conf;
+    //disable interrupt
+    io_conf.intr_type = GPIO_INTR_DISABLE;
+    //set as output mode
+    io_conf.mode = GPIO_MODE_OUTPUT;
+    //bit mask of the pins that you want to set,e.g.GPIO18/19
+    io_conf.pin_bit_mask = DBG_PIN_SEL;
+    //disable pull-down mode
+    io_conf.pull_down_en = 0;
+    //disable pull-up mode
+    io_conf.pull_up_en = 0;
+    //configure GPIO with the given settings
+    gpio_config(&io_conf);
+}
+
 void app_main(void)
 {
     esp_err_t ret;
@@ -105,7 +130,19 @@ void app_main(void)
 
     led_init();
     led_debug_init();
-    mpu6050_init();
+    // mpu6050_init();
+
+    dbg_io_init();
+    // rtc_gpio_init(0);
+    ESP_LOGI("MAIN", "DEEP SLEEP ENTER");
+    esp_sleep_enable_ext0_wakeup(0, 0); // [0, 0]: [GPIO0 for ext0 source, low level wakeup]
+    esp_deep_sleep_start();
+    ESP_LOGI("MAIN", "DEEP SLEEP EXIT");
+    while (1)
+    {
+        vTaskDelay(1000 / portTICK_PERIOD_MS);    
+        led_debug_toggle();
+    }
     
     // fish bite detect library initialize
     fbd_init();
