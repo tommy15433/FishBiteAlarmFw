@@ -19,7 +19,8 @@
 #define LED_TAG "LED_PORT"
 #define LED_PWM_TAG "LED_PWM"
 
-static mcpwm_config_t pwm_config;
+static mcpwm_config_t led_red_pwm_config;
+static mcpwm_config_t led_grn_pwm_config;
 
 typedef struct{
     double brightness;
@@ -37,11 +38,12 @@ static led_ctrl led_ctrl_grn = {
 
 void led_set_ctrl(void)
 {
-    pwm_config.cmpr_a = led_ctrl_red.brightness * led_ctrl_red.enableValue;
-    pwm_config.cmpr_b = led_ctrl_grn.brightness * led_ctrl_grn.enableValue;
+    led_red_pwm_config.cmpr_a = led_ctrl_red.brightness * led_ctrl_red.enableValue;
+    led_grn_pwm_config.cmpr_a = led_ctrl_grn.brightness * led_ctrl_grn.enableValue;
     
-    mcpwm_init(MCPWM_UNIT_0, MCPWM_TIMER_0, &pwm_config);
-    ESP_LOGI(LED_PWM_TAG, "RED: %f, GRN: %f", pwm_config.cmpr_a, pwm_config.cmpr_b);
+    mcpwm_init(MCPWM_UNIT_0, MCPWM_TIMER_0, &led_red_pwm_config);
+    mcpwm_init(MCPWM_UNIT_1, MCPWM_TIMER_0, &led_grn_pwm_config);
+    ESP_LOGI(LED_PWM_TAG, "RED: %f, GRN: %f", led_red_pwm_config.cmpr_a, led_grn_pwm_config.cmpr_a);
 }
 
 void led_set_colorRed(void) 
@@ -78,23 +80,30 @@ void led_set_brightness(double val)
     led_set_ctrl();
 }
 
+// MCPWM_UNIT_0: RED
+// MCPWM_UNIT_1: GRN
 void led_init(void)
 {
     ESP_LOGI(LED_TAG, "RED: %d, GRN: %d", GPIO_LED_RED, GPIO_LED_GRN);
 
     mcpwm_pin_config_t pin_config = {
         .mcpwm0a_out_num = GPIO_LED_RED,
-        .mcpwm0b_out_num = GPIO_LED_GRN,
     };
     mcpwm_set_pin(MCPWM_UNIT_0, &pin_config);
+    pin_config.mcpwm0a_out_num  = GPIO_LED_GRN;
+    mcpwm_set_pin(MCPWM_UNIT_1, &pin_config);
 
-    pwm_config.frequency = 1000;    //frequency = 1000Hz
-    pwm_config.cmpr_a = 50.0;       //duty cycle of PWMxA = 60.0%
-    pwm_config.cmpr_b = 50.0;       //duty cycle of PWMxb = 50.0%
-    pwm_config.counter_mode = MCPWM_UP_COUNTER;
-    pwm_config.duty_mode = MCPWM_DUTY_MODE_0;
-    
-    mcpwm_init(MCPWM_UNIT_0, MCPWM_TIMER_0, &pwm_config);
+    led_red_pwm_config.frequency = 1000;    //frequency = 1000Hz
+    led_red_pwm_config.cmpr_a = 50.0;       //duty cycle of PWMxA = 60.0%
+    led_red_pwm_config.counter_mode = MCPWM_UP_COUNTER;
+    led_red_pwm_config.duty_mode = MCPWM_DUTY_MODE_1;   // low level active
+    mcpwm_init(MCPWM_UNIT_0, MCPWM_TIMER_0, &led_red_pwm_config);
+
+    led_grn_pwm_config.frequency = 1000;    //frequency = 1000Hz
+    led_grn_pwm_config.cmpr_a = 50.0;       //duty cycle of PWMxA = 60.0%
+    led_grn_pwm_config.counter_mode = MCPWM_UP_COUNTER;
+    led_grn_pwm_config.duty_mode = MCPWM_DUTY_MODE_0;   // high level active
+    mcpwm_init(MCPWM_UNIT_1, MCPWM_TIMER_0, &led_grn_pwm_config);
 
     led_set_colorGrn();
     led_set_brightness(50);
