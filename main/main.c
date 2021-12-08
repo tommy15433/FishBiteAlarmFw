@@ -10,6 +10,10 @@
 #include "nvs_flash.h"
 #include "esp_bt.h"
 
+#include "esp_sleep.h"
+#include "driver/gpio.h"
+#include "driver/rtc_io.h"
+
 #include "esp_gap_ble_api.h"
 #include "esp_gatts_api.h"
 #include "esp_bt_defs.h"
@@ -21,6 +25,7 @@
 #include "fishBiteDetector.h"
 
 #include "ble_demo.h"
+#include "main.h"
 
 #include "sdkconfig.h"
 
@@ -92,7 +97,33 @@ void onBrightnessChanged(uint8_t value)
     led_set_brightness((double)value);
 }
 
-void app_main(void)
+void enter_deep_sleep(void)
+{
+    esp_sleep_enable_ext0_wakeup(GPIO_RESET_NO, GPIO_RESET_PRESSED); // [0, 0]: [GPIO0 for ext0 source, low level wakeup]
+    esp_deep_sleep_start();
+}
+
+bool detect_button_steady_for_a_second(int gpioNo, int gpioLevel)
+{
+    if (gpio_get_level(gpioNo) != gpioLevel)
+    {
+        return false;
+    }
+
+    for (int i = 0; i < 10; i++)
+    {
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+
+        if (gpio_get_level(gpioNo) != gpioLevel)
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void nvs_init(void)
 {
     esp_err_t ret;
     // Initialize NVS.
@@ -102,6 +133,52 @@ void app_main(void)
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK( ret );
+}
+
+void reset_gpio_init(void)
+{
+    gpio_config_t io_conf;
+
+    io_conf.intr_type = GPIO_INTR_DISABLE;
+    io_conf.mode = GPIO_MODE_INPUT;
+    io_conf.pin_bit_mask = GPIO_RESET_PINSEL;
+    io_conf.pull_down_en = 0;
+    io_conf.pull_up_en = 0;
+
+    gpio_config(&io_conf);
+}
+
+
+void gpio_reset_handler(void)
+{
+    if (detect_button_steady_for_a_second(GPIO_RESET_NO, GPIO_RESET_PRESSED) == true)
+    {
+        enter_deep_sleep();
+    }
+}
+
+void deep_sleep_init(void)
+{
+    ESP_ERROR_CHECK(gpio_set_intr_type(GPIO_RESET_NO, GPIO_RESET_LEVEL));
+    ESP_ERROR_CHECK(gpio_intr_enable(GPIO_RESET_NO));
+    gpio_isr_register(gpio_reset_handler, NULL, ESP_INTR_FLAG_NMI, NULL);
+
+    gpio_install_isr_service(ESP_INTR_FLAG_NMI);
+}
+
+void app_main(void)
+{
+    reset_gpio_init();
+
+    // if button is pressed on initialize, and being pressed for 1second then run application
+    if (detect_button_steady_for_a_second(GPIO_RESET_NO, GPIO_RESET_PRESSED) == false)
+    {
+        enter_deep_sleep();
+    }
+
+    nvs_init();
+
+    deep_sleep_init();
 
     led_init();
     led_debug_init();
