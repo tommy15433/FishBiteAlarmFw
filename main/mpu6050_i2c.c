@@ -50,6 +50,7 @@ uint8_t data_register[MPU6050_DATA_LEN];
 
 TaskHandle_t xHandle;
 bool isReady = true;
+bool isActive = false;
 
 /**
  * @brief i2c master initialization
@@ -183,6 +184,14 @@ double mpu6050_get_gyroZ(){
 
 void mpu6050_update()
 {
+    if (isActive == false)
+    {
+        return;
+        for (int i = 0; i < MPU6050_DATA_LEN; i++){
+            data_register[i] = 0x00;
+        }
+    }
+
     esp_err_t err;
     err = mpu6050_i2c_read(REG_ACC_X_H, data_register);
     if (err != ESP_OK) {
@@ -233,13 +242,14 @@ int mpu6050_get_accel_resolution(void)
     return resolution;
 }
 
-void mpu6050_init(void)
+int mpu6050_init(void)
 {
     esp_err_t err;
     
     err = i2c_master_init();
     if (err != ESP_OK) {
         ESP_LOGI(TAG, "i2c master init err (%d)", err);
+        return 0;
     }
     
     // err = mpu6050_i2c_write(PWR_MGMT_1, 0x20);
@@ -247,13 +257,17 @@ void mpu6050_init(void)
     err = mpu6050_i2c_write(PWR_MGMT_1, 0x00);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "%s: [mpu6050_i2c_write] fail.", __func__);
+        return 0;
     }
 
     err = mpu6050_i2c_write(ACCEL_CONFIG, AFS_SEL_16G);
     if (err != ESP_OK)
     {
         ESP_LOGE(TAG, "%s: [mpu6050_i2c_write(0x1C, 0x18)] fail.", __func__);
+        return 0;
     }
     // accel resolution 16G
 
+    isActive = true;
+    return 1;
 }

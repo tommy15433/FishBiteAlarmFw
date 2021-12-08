@@ -44,7 +44,7 @@ void mpu6050_deinit(void);
 void mpu6050_read(mpu6050_t * this);
 void mpu6050_update(void);
 void mpu6050_sleep(void);
-void mpu6050_init(void);
+int mpu6050_init(void);
 
 esp_err_t mpu6050_i2c_read_gx(int16_t* data);
 
