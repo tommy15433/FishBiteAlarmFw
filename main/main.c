@@ -31,10 +31,29 @@
 
 #define MAIN_TAG    "MAIN_FN"
 
+void enter_deep_sleep(void);
+
 static void checkFishBite(void* arg)
 {
+    int intBtnCnt = 0;
+    int loopPeriodMs = 50;
+
     while (1)
     {
+        if (gpio_get_level(GPIO_RESET_NO) == GPIO_RESET_PRESSED)
+        {
+            intBtnCnt++;
+        }
+        else
+        {
+            intBtnCnt = 0;
+        }
+
+        if (intBtnCnt >= 20)
+        {
+            enter_deep_sleep();
+        }
+
         mpu6050_update();
         double az = mpu6050_get_accelZ();
         fbd_update(az/mpu6050_get_accel_resolution());
@@ -52,7 +71,7 @@ static void checkFishBite(void* arg)
         // }
         
         led_debug_toggle();
-        vTaskDelay(50/ portTICK_PERIOD_MS);
+        vTaskDelay(loopPeriodMs / portTICK_PERIOD_MS);
     }
 }
 
@@ -148,24 +167,6 @@ void reset_gpio_init(void)
     gpio_config(&io_conf);
 }
 
-
-void gpio_reset_handler(void)
-{
-    if (detect_button_steady_for_a_second(GPIO_RESET_NO, GPIO_RESET_PRESSED) == true)
-    {
-        enter_deep_sleep();
-    }
-}
-
-void deep_sleep_init(void)
-{
-    ESP_ERROR_CHECK(gpio_set_intr_type(GPIO_RESET_NO, GPIO_RESET_LEVEL));
-    ESP_ERROR_CHECK(gpio_intr_enable(GPIO_RESET_NO));
-    gpio_isr_register(gpio_reset_handler, NULL, ESP_INTR_FLAG_NMI, NULL);
-
-    gpio_install_isr_service(ESP_INTR_FLAG_NMI);
-}
-
 void app_main(void)
 {
     reset_gpio_init();
@@ -177,8 +178,6 @@ void app_main(void)
     }
 
     nvs_init();
-
-    deep_sleep_init();
 
     led_init();
     led_debug_init();
