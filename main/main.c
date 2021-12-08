@@ -118,6 +118,7 @@ void onBrightnessChanged(uint8_t value)
 
 void enter_deep_sleep(void)
 {
+    mpu6050_sleep();
     esp_sleep_enable_ext0_wakeup(GPIO_RESET_NO, GPIO_RESET_PRESSED); // [0, 0]: [GPIO0 for ext0 source, low level wakeup]
     esp_deep_sleep_start();
 }
